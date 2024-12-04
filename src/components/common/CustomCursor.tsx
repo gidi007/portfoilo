@@ -1,64 +1,107 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, useSpring, useMotionValue } from 'framer-motion'
 
-export const CustomCursor: React.FC = () => {
-  const cursorX = useMotionValue(-100)
-  const cursorY = useMotionValue(-100)
+interface CursorProps {
+  zIndex?: number
+}
+
+export const CustomCursor: React.FC<CursorProps> = ({ zIndex = 9999 }) => {
+  const [isMobile, setIsMobile] = useState(false)
+  const [isClient, setIsClient] = useState(false)
   const [isHovering, setIsHovering] = useState(false)
 
-  const springConfig = { damping: 15, stiffness: 150, mass: 0.1 }
+  const cursorX = useMotionValue(-100)
+  const cursorY = useMotionValue(-100)
+
+  const springConfig = useMemo(() => ({ 
+    damping: 15, 
+    stiffness: 300, 
+    mass: 0.1 
+  }), [])
+
   const cursorXSpring = useSpring(cursorX, springConfig)
   const cursorYSpring = useSpring(cursorY, springConfig)
 
-  useEffect(() => {
-    const moveCursor = (e: MouseEvent) => {
-      cursorX.set(e.clientX)
-      cursorY.set(e.clientY)
-    }
+  // Detect mobile devices more robustly
+  const checkMobile = useCallback(() => {
+    const mobileCheck = 
+      typeof window !== 'undefined' && (
+        'ontouchstart' in window || 
+        navigator.maxTouchPoints > 0 || 
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      )
+    
+    return mobileCheck
+  }, [])
 
-    const handleMouseEnter = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (
-        target.tagName === 'BUTTON' ||
-        target.tagName === 'A' ||
-        (target.closest && (target.closest('button') || target.closest('a')))
-      ) {
-        setIsHovering(true)
-      }
-    }
-
-    const handleMouseLeave = () => {
-      setIsHovering(false)
-    }
-
-    window.addEventListener('mousemove', moveCursor)
-    document.addEventListener('mouseenter', handleMouseEnter, true)
-    document.addEventListener('mouseleave', handleMouseLeave, true)
-
-    return () => {
-      window.removeEventListener('mousemove', moveCursor)
-      document.removeEventListener('mouseenter', handleMouseEnter)
-      document.removeEventListener('mouseleave', handleMouseLeave)
-    }
+  // Optimized mouse move handler
+  const moveCursor = useCallback((e: MouseEvent) => {
+    cursorX.set(e.clientX)
+    cursorY.set(e.clientY)
   }, [cursorX, cursorY])
 
+  // Hover detection with more comprehensive selector
+  const handleHoverStart = useCallback((e: MouseEvent) => {
+    const target = e.target as HTMLElement
+    const isInteractive = 
+      target.tagName === 'BUTTON' || 
+      target.tagName === 'A' || 
+      target.getAttribute('role') === 'button' ||
+      target.closest('button, a, [role="button"], .interactive')
+    
+    setIsHovering(!!isInteractive)
+  }, [])
+
+  const handleHoverEnd = useCallback(() => {
+    setIsHovering(false)
+  }, [])
+
   useEffect(() => {
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-      document.body.style.cursor = 'auto';
-    } else {
-      document.body.style.cursor = 'none';
+    // Ensure this only runs on client
+    setIsClient(true)
+    
+    // Mobile detection
+    setIsMobile(checkMobile())
+  }, [checkMobile])
+
+  useEffect(() => {
+    // Only attach listeners if not mobile and on client
+    if (!isMobile && isClient) {
+      window.addEventListener('mousemove', moveCursor)
+      document.addEventListener('mouseover', handleHoverStart, true)
+      document.addEventListener('mouseout', handleHoverEnd, true)
+
+      // Disable default cursor
+      document.body.style.cursor = 'none'
+
+      return () => {
+        window.removeEventListener('mousemove', moveCursor)
+        document.removeEventListener('mouseover', handleHoverStart)
+        document.removeEventListener('mouseout', handleHoverEnd)
+        
+        // Restore default cursor
+        document.body.style.cursor = 'auto'
+      }
     }
-  }, []);
+  }, [isMobile, isClient, moveCursor, handleHoverStart, handleHoverEnd])
+
+  // No render if mobile or not client-side
+  if (isMobile || !isClient) return null
 
   return (
     <>
+      {/* Main large cursor circle */}
       <motion.div
-        className="fixed top-0 left-0 pointer-events-none z-50 mix-blend-difference"
+        className="fixed pointer-events-none mix-blend-difference"
         style={{
           x: cursorXSpring,
           y: cursorYSpring,
+          zIndex,
+          top: 0,
+          left: 0,
+          transform: `translateX(${cursorXSpring.get()}px) translateY(${cursorYSpring.get()}px)`
         }}
       >
         <motion.div
@@ -81,11 +124,17 @@ export const CustomCursor: React.FC = () => {
           />
         </motion.div>
       </motion.div>
+
+      {/* Small cursor dot */}
       <motion.div
-        className="fixed top-0 left-0 pointer-events-none z-40 mix-blend-difference"
+        className="fixed pointer-events-none mix-blend-difference"
         style={{
           x: cursorX,
           y: cursorY,
+          zIndex: zIndex - 1,
+          top: 0,
+          left: 0,
+          transform: `translateX(${cursorX.get()}px) translateY(${cursorY.get()}px)`
         }}
       >
         <div className="w-2 h-2 bg-primary rounded-full opacity-50" />
@@ -95,4 +144,3 @@ export const CustomCursor: React.FC = () => {
 }
 
 export default CustomCursor
-

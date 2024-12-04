@@ -1,24 +1,25 @@
-//Layout.tsx
+// Layout.tsx
 import './globals.css'
 import { Inter } from 'next/font/google'
-import MainLayout from '../layouts/MainLayout' 
-import Navbar from '@/components/common/Navbar'
-import CustomCursor from '@/components/common/CustomCursor'
+import { Metadata } from 'next'
+import MainLayout from '../layouts/MainLayout'
 
 const inter = Inter({ subsets: ['latin'] })
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Favour Bawa Portfolio',
   description: 'A web-design showcase of my work and skills',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 }
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="scroll-smooth">
+      <body className={`${inter.className} antialiased`}>
         <MainLayout>
           {children}
         </MainLayout>
